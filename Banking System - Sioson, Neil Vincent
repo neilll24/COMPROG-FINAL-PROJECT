@@ -1,0 +1,266 @@
+ #include <iostream>
+#include <fstream>
+#include <cstdlib>
+#include <ctime>
+#include <iomanip>
+
+using namespace std;
+
+class Account {
+public:
+    int accountNumber;
+    string accountHolderName;
+    double balance;
+    string password;
+
+    Account(int number, const string& name, double initialBalance, const string& pwd)
+        : accountNumber(number), accountHolderName(name), balance(initialBalance), password(pwd) {}
+
+    void displayInfo() const {
+        cout << "Account Number: " << accountNumber << "\n";
+        cout << "Account Holder: " << accountHolderName << "\n";
+        cout << "Balance: $" << fixed << setprecision(2) << balance << "\n";
+    }
+};
+
+class Admin {
+private:
+    static const string adminUsername;
+    static const string adminPassword;
+
+public:
+    static void authenticateAdmin() {
+        string enteredUsername, enteredPassword;
+
+        cout << "Enter Admin Username: ";
+        cin >> enteredUsername;
+
+        cout << "Enter Admin Password: ";
+        cin >> enteredPassword;
+
+        if (enteredUsername == adminUsername && enteredPassword == adminPassword) {
+            cout << "Authentication successful.\n";
+        } else {
+            cerr << "Authentication failed. \n";
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    static void createAccount() {
+        authenticateAdmin();
+
+        int number;
+        string name;
+        double initialBalance;
+        string password;
+
+        cout << "Enter Account Number: ";
+        cin >> number;
+
+        cout << "Enter Account Holder Name: ";
+        cin.ignore();
+        getline(cin, name);
+
+        cout << "Enter Initial Balance: $";
+        cin >> initialBalance;
+
+        cout << "Enter Password for the user: ";
+        cin >> password;
+
+        ofstream file("accounts.txt", ios::app);
+
+        if (!file) {
+            cerr << "Error opening file. \n";
+            exit(EXIT_FAILURE);
+        }
+
+        file << number << " " << name << " " << initialBalance << " " << password << endl;
+
+        cout << "Account created successfully!\n";
+
+        file.close();
+    }
+
+    static void viewAllAccounts() {
+        ifstream file("accounts.txt");
+
+        if (!file) {
+            cerr << "Error opening file. \n";
+            exit(EXIT_FAILURE);
+        }
+
+        Account account(0, "", 0.0, "");
+
+        cout << "\nAll Accounts:\n";
+        while (file >> account.accountNumber >> account.accountHolderName >> account.balance >> account.password) {
+            account.displayInfo();
+            cout << "------------------------\n";
+        }
+
+        file.close();
+    }
+};
+
+const string Admin::adminUsername = "admin";
+const string Admin::adminPassword = "adminpass";
+
+class User {
+public:
+    static void checkBalance(int accountNumber, const string& enteredPassword) {
+        ifstream file("accounts.txt");
+        Account account(0, "", 0.0, "");
+        bool accountFound = false;
+
+        if (!file) {
+            cerr << "Error opening file. \n";
+            exit(EXIT_FAILURE);
+        }
+
+        while (file >> account.accountNumber >> account.accountHolderName >> account.balance >> account.password) {
+            if (account.accountNumber == accountNumber && account.password == enteredPassword) {
+                account.displayInfo();
+                accountFound = true;
+                break;
+            }
+        }
+
+        if (!accountFound) {
+            cout << "Account not found or incorrect password.\n";
+        }
+
+        file.close();
+    }
+
+    static void updateAccount(int accountNumber, double amount, const string& enteredPassword, const string& operation) {
+        ifstream inFile("accounts.txt");
+        ofstream outFile("temp.txt");
+
+        Account account(0, "", 0.0, "");
+        bool accountFound = false;
+
+        if (!inFile || !outFile) {
+            cerr << "Error opening file. \n";
+            exit(EXIT_FAILURE);
+        }
+
+        while (inFile >> account.accountNumber >> account.accountHolderName >> account.balance >> account.password) {
+            if (account.accountNumber == accountNumber && account.password == enteredPassword) {
+                if (operation == "withdraw" && amount > account.balance) {
+                    cout << "Insufficient funds.\n";
+                    accountFound = true;
+                } else {
+                    if (operation == "withdraw") {
+                        account.balance -= amount;
+                        cout << "Withdrawal successful. New Balance: $" << account.balance << endl;
+                    } else if (operation == "deposit") {
+                        account.balance += amount;
+                        cout << "Deposit successful. New Balance: $" << account.balance << endl;
+                    }
+                    accountFound = true;
+                }
+            }
+            outFile << account.accountNumber << " " << account.accountHolderName << " " << account.balance << " " << account.password << endl;
+        }
+
+        if (!accountFound) {
+            cout << "Account not found or incorrect password.\n";
+        }
+
+        inFile.close();
+        outFile.close();
+
+        remove("accounts.txt");
+        rename("temp.txt", "accounts.txt");
+    }
+
+    static void withdraw(int accountNumber, double amount, const string& enteredPassword) {
+        updateAccount(accountNumber, amount, enteredPassword, "withdraw");
+    }
+
+    static void deposit(int accountNumber, double amount, const string& enteredPassword) {
+        updateAccount(accountNumber, amount, enteredPassword, "deposit");
+    }
+
+    static void transfer(int fromAccount, int toAccount, double amount, const string& enteredPassword) {
+        withdraw(fromAccount, amount, enteredPassword);
+        deposit(toAccount, amount, enteredPassword);
+    }
+};
+
+int main() {
+    int userType;
+    cout << "Welcome to iTamaraw Bank!\n";
+    cout << "[1] Admin\n";
+    cout << "[2] User\n";
+    cout << "Enter your user type: ";
+    cin >> userType;
+
+    if (userType == 1) {
+        Admin::authenticateAdmin();
+
+        cout << "\nADMIN MENU\n";
+        cout << "[1] Create Account\n";
+        cout << "[2] View All Accounts\n";
+        int adminChoice;
+        cout << "Enter your choice: ";
+        cin >> adminChoice;
+
+        if (adminChoice == 1) {
+            Admin::createAccount();
+        } else if (adminChoice == 2) {
+            Admin::viewAllAccounts();
+        } else {
+            cout << "Invalid choice.\n";
+        }
+    } else if (userType == 2) {
+        cout << "\nUSER MENU\n";
+        cout << "[1] Check Balance\n";
+        cout << "[2] Withdraw\n";
+        cout << "[3] Deposit\n";
+        cout << "[4] Transfer Money\n";
+        int userChoice;
+        cout << "Enter your choice: ";
+        cin >> userChoice;
+
+        int accountNumber;
+        double amount;
+        int toAccount;
+        string enteredPassword;
+
+        cout << "Enter your account number: ";
+        cin >> accountNumber;
+
+        cout << "Enter your password: ";
+        cin >> enteredPassword;
+
+        switch (userChoice) {
+            case 1:
+                User::checkBalance(accountNumber, enteredPassword);
+                break;
+            case 2:
+                cout << "Enter the amount to withdraw: $";
+                cin >> amount;
+                User::withdraw(accountNumber, amount, enteredPassword);
+                break;
+            case 3:
+                cout << "Enter the amount to deposit: $";
+                cin >> amount;
+                User::deposit(accountNumber, amount, enteredPassword);
+                break;
+            case 4:
+                cout << "Enter the destination account number: ";
+                cin >> toAccount;
+                cout << "Enter the amount to transfer: $";
+                cin >> amount;
+                User::transfer(accountNumber, toAccount, amount, enteredPassword);
+                break;
+            default:
+                cout << "Invalid choice.\n";
+                break;
+        }
+    } else {
+        cout << "Invalid user type. \n";
+    }
+
+    return 0;
+}
